@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kalkulator Arah Kiblat</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f7fafc; margin: 0; padding: 0; }
+    header { background: #2b6cb0; color: white; text-align: center; padding: 1rem; }
+    main { max-width: 600px; margin: 2rem auto; background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    label { display: block; margin-top: 10px; }
+    input { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 6px; }
+    button { margin-top: 15px; background: #2b6cb0; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #1e4e8c; }
+    #hasil { margin-top: 20px; font-size: 1.1em; font-weight: bold; color: #2d3748; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Kalkulator Arah Kiblat</h1>
+    <p>Hitung arah kiblat dari lokasi Anda menggunakan koordinat lintang dan bujur.</p>
+  </header>
+
+  <main>
+    <form id="kiblatForm">
+      <label>Lintang Tempat (°):
+        <input type="number" id="lat" step="any" placeholder="contoh: -6.2000" required>
+      </label>
+      <label>Bujur Tempat (°):
+        <input type="number" id="lon" step="any" placeholder="contoh: 106.8167" required>
+      </label>
+      <button type="submit">Hitung Arah Kiblat</button>
+    </form>
+
+    <div id="hasil"></div>
+  </main>
+
+  <script>
+    // Koordinat Ka'bah (Makkah)
+    const latKaabah = 21.4225; // lintang
+    const lonKaabah = 39.8262; // bujur
+
+    function derajatKeRadian(deg) {
+      return deg * Math.PI / 180;
+    }
+
+    function radianKeDerajat(rad) {
+      return rad * 180 / Math.PI;
+    }
+
+    document.getElementById('kiblatForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const lat = parseFloat(document.getElementById('lat').value);
+      const lon = parseFloat(document.getElementById('lon').value);
+
+      // Rumus arah kiblat (azimuth dari utara)
+      const dLon = derajatKeRadian(lonKaabah - lon);
+      const y = Math.sin(dLon);
+      const x = Math.cos(derajatKeRadian(lat)) * Math.tan(derajatKeRadian(latKaabah)) - Math.sin(derajatKeRadian(lat)) * Math.cos(dLon);
+      let azimuth = Math.atan2(y, x);
+
+      azimuth = radianKeDerajat(azimuth);
+      if (azimuth < 0) azimuth += 360;
+
+      document.getElementById('hasil').innerHTML = `Arah kiblat dari lokasi ini adalah <strong>${azimuth.toFixed(2)}°</strong> dari utara sejati.`;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Arah Kiblat — Compass Interaktif & Peta</title>
+  <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg1:#0f1724;--bg2:#071331;--accent:#f97316;--glass:rgba(255,255,255,0.06)}
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial}
+    body{margin:0;background:linear-gradient(180deg,var(--bg1),var(--bg2));color:#e6eef8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px}
+    .wrap{width:100%;max-width:1100px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(2,6,23,0.6);display:grid;grid-template-columns:360px 1fr;gap:18px}
+    .card{background:var(--glass);border-radius:12px;padding:18px}
+    h1{margin:0 0 8px;font-size:20px;color:#fff;letter-spacing:0.2px}
+    p.lead{margin:0 0 14px;color:#bcd3ef;font-size:13px}
+    .compass{height:320px;display:flex;align-items:center;justify-content:center;position:relative}
+    .compass .ring{width:260px;height:260px;border-radius:50%;background:radial-gradient(circle at 30% 20%, rgba(255,255,255,0.03), transparent 30%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 2px 12px rgba(0,0,0,0.6)}
+    .compass .needle{width:6px;height:120px;position:relative;transform-origin:50% 85%;transition:transform 300ms ease-out}
+    .needle::before{content:'';position:absolute;left:50%;top:0;transform:translateX(-50%);width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-bottom:26px solid var(--accent)}
+    .needle::after{content:'';position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,0.08);box-shadow:0 2px 8px rgba(0,0,0,0.6)}
+    .meta{display:flex;gap:10px;flex-direction:column;margin-top:12px}
+    .meta .row{display:flex;justify-content:space-between;align-items:center}
+    .btn{background:linear-gradient(90deg,var(--accent),#ffb86b);border:none;padding:8px 12px;border-radius:8px;color:#08122a;font-weight:700;cursor:pointer}
+    #map{height:100%;min-height:420px;border-radius:12px}
+    .small{font-size:12px;color:#a9c0e6}
+    input[type="number"],select{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
+    .controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+    .footer{font-size:12px;color:#9fb7df;margin-top:10px}
+    .badge{display:inline-block;background:rgba(255,255,255,0.04);padding:6px 10px;border-radius:999px;font-weight:600}
+    @media(max-width:900px){.wrap{grid-template-columns:1fr;max-width:760px}.compass{height:260px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Arah Kiblat — Compass Interaktif</h1>
+      <p class="lead">Dapatkan arah kiblat dari posisimu secara real-time. Gunakan perangkat mobile untuk hasil terbaik (sensor kompas).</p>
+
+      <div class="compass" aria-hidden>
+        <div class="ring" id="ring">
+          <div class="needle" id="needle" style="transform:rotate(0deg)"></div>
+        </div>
+      </div>
+
+      <div class="meta">
+        <div class="row"><div>
+          <div class="small">Posisi (lat, lon)</div>
+          <div id="posText">—</div>
+        </div>
+        <div>
+          <div class="small">Sudut Kiblat</div>
+          <div id="bearingText" class="badge">—°</div>
+        </div></div>
+
+        <div class="row"><div>
+          <div class="small">Arah dari kepala perangkat</div>
+          <div id="headingText">—°</div>
+        </div>
+        <div>
+          <div class="small">Selisih</div>
+          <div id="diffText">—°</div>
+        </div></div>
+
+        <div class="controls">
+          <button class="btn" id="btnLocate">Gunakan Lokasi Saat Ini</button>
+          <button class="btn" id="btnCalib">Kalibrasi Sensor</button>
+        </div>
+
+        <div style="margin-top:8px">
+          <label class="small">Atau masukkan koordinat:</label>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <input id="latInput" type="number" step="0.000001" placeholder="Latitude">
+            <input id="lonInput" type="number" step="0.000001" placeholder="Longitude">
+            <button class="btn" id="btnApply">Terapkan</button>
+          </div>
+        </div>
+
+        <div class="footer">Ka'bah — Koordinat referensi: <span class="small">21.25°N, 39.50°E</span></div>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div>
+          <div style="font-weight:700">Peta & Jalur Kiblat</div>
+          <div class="small">Tunjukkan arah garis besar (great-circle) dari posisimu ke Ka'bah</div>
+        </div>
+        <div class="small">Tip: klik peta untuk set posisi manual</div>
+      </div>
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // constants
+    const KABA_LAT = 21.25 *Math.PI/180;
+    const KABA_LON = 39.50 *Math.PI/180;
+
+    let userLat = null, userLon = null, userHeading = 0, lastBearing = 0;
+
+    const posText = document.getElementById('posText');
+    const bearingText = document.getElementById('bearingText');
+    const headingText = document.getElementById('headingText');
+    const diffText = document.getElementById('diffText');
+    const needle = document.getElementById('needle');
+
+    // map init
+    const map = L.map('map', {zoomControl:true}).setView([2.5,100], 3);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+    const kaMarker = L.marker([21.25,39.50]).addTo(map).bindPopup("Ka'bah (Makkah)");
+    let userMarker = null, gcLine = null;
+
+    function toDeg(rad){return rad*180/Math.PI}
+    function toRad(deg){return deg*Math.PI/180}
+
+    // calculate initial bearing (from lat1,lon1 to lat2,lon2) - result in degrees from North
+    function calcBearing(lat1,lon1,lat2,lon2){
+      const φ1 = toRad(lat1), φ2 = toRad(lat2);
+      const Δλ = toRad(lon2-lon1);
+      const y = Math.sin(Δλ)*Math.cos(φ2);
+      const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+      let θ = Math.atan2(y,x);
+      θ = (toDeg(θ)+360)%360; // degrees east of north
+      return θ;
+    }
+
+    function updateUI(){
+      if(userLat==null) return;
+      posText.textContent = userLat.toFixed(6) + ' , ' + userLon.toFixed(6);
+      const bearing = calcBearing(userLat,userLon,21.25,39.50); // deg
+      lastBearing = bearing;
+      bearingText.textContent = bearing.toFixed(2) + '°';
+      headingText.textContent = (userHeading||0).toFixed(2) + '°';
+      const diff = ((bearing - userHeading)+540)%360 - 180; // shortest signed angle
+      diffText.textContent = Math.abs(diff).toFixed(2) + '° ' + (diff>0? '← putar kiri':'→ putar kanan');
+
+      // rotate needle so that it points to kiblat relative to device heading
+      // needle rotation = bearing - heading
+      const rot = (bearing - userHeading + 360) % 360;
+      needle.style.transform = `rotate(${rot}deg)`;
+
+      // update map: place marker, draw great-circle line
+      if(userMarker) userMarker.setLatLng([userLat,userLon]); else userMarker = L.marker([userLat,userLon]).addTo(map).bindPopup('Posisimu').openPopup();
+      if(gcLine) map.removeLayer(gcLine);
+      // build simple great-circle polyline with interpolation
+      const points = greatCirclePoints(userLat,userLon,21.25,39.50,80);
+      gcLine = L.polyline(points,{color:'#ffb86b',weight:3,opacity:0.9}).addTo(map);
+      map.fitBounds(L.featureGroup([userMarker,kaMarker,gcLine]).getBounds().pad(0.25));
+    }
+
+    // interpolate great-circle (naive linear on sphere)
+    function greatCirclePoints(lat1,lon1,lat2,lon2,n){
+      const φ1 = toRad(lat1), λ1 = toRad(lon1);
+      const φ2 = toRad(lat2), λ2 = toRad(lon2);
+      const d = 2*Math.asin(Math.sqrt(Math.sin((φ2-φ1)/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin((λ2-λ1)/2)**2));
+      const points = [];
+      if(d===0){return [[lat1,lon1],[lat2,lon2]]}
+      for(let i=0;i<=n;i++){
+        const f = i/n;
+        const A = Math.sin((1-f)*d)/Math.sin(d);
+        const B = Math.sin(f*d)/Math.sin(d);
+        const x = A*Math.cos(φ1)*Math.cos(λ1) + B*Math.cos(φ2)*Math.cos(λ2);
+        const y = A*Math.cos(φ1)*Math.sin(λ1) + B*Math.cos(φ2)*Math.sin(λ2);
+        const z = A*Math.sin(φ1) + B*Math.sin(φ2);
+        const φi = Math.atan2(z, Math.sqrt(x*x+y*y));
+        const λi = Math.atan2(y,x);
+        points.push([toDeg(φi), toDeg(λi)]);
+      }
+      return points;
+    }
+
+    // get current geolocation
+    document.getElementById('btnLocate').addEventListener('click', ()=>{
+      if(!navigator.geolocation){alert('Geolocation tidak tersedia di browser ini.'); return}
+      navigator.geolocation.getCurrentPosition(pos=>{
+        userLat = pos.coords.latitude; userLon = pos.coords.longitude; updateUI();
+      }, err=>{alert('Gagal mendapatkan lokasi: '+err.message)},{enableHighAccuracy:true,timeout:10000});
+    });
+
+    // apply manual
+    document.getElementById('btnApply').addEventListener('click', ()=>{
+      const lat = parseFloat(document.getElementById('latInput').value);
+      const lon = parseFloat(document.getElementById('lonInput').value);
+      if(Number.isFinite(lat) && Number.isFinite(lon)){ userLat=lat; userLon=lon; updateUI(); }
+      else alert('Masukkan koordinat yang valid.')
+    });
+
+    // allow clicking map to set position
+    map.on('click', e=>{ userLat = e.latlng.lat; userLon = e.latlng.lng; document.getElementById('latInput').value=userLat; document.getElementById('lonInput').value=userLon; updateUI(); });
+
+    // device orientation (heading)
+    function handleOrientation(event){
+      let heading = null;
+      if(event.webkitCompassHeading !== undefined){ // iOS
+        heading = event.webkitCompassHeading; // degrees
+      } else if(event.absolute && event.alpha !== null){
+        // alpha is rotation around z axis in degrees (0 = device facing north?)
+        // We attempt to use alpha; results vary by device
+        heading = 360 - event.alpha; // convert to clockwise-from-north
+      }
+      if(heading!==null){ userHeading = heading; updateUI(); }
+    }
+
+    if(window.DeviceOrientationEvent){
+      if(typeof DeviceOrientationEvent.requestPermission === 'function'){
+        // iOS 13+ requires permission
+        document.getElementById('btnCalib').addEventListener('click', ()=>{
+          DeviceOrientationEvent.requestPermission().then(resp=>{ if(resp==='granted'){ window.addEventListener('deviceorientation', handleOrientation, true); alert('Sensor diizinkan — putar perangkat untuk melihat arah') } else alert('Izin sensor kompas ditolak') }).catch(()=>alert('Tidak dapat meminta izin sensor'))
+        });
+      } else {
+        // non-iOS
+        window.addEventListener('deviceorientation', handleOrientation, true);
+      }
+    } else {
+      document.getElementById('btnCalib').disabled = true;
+      document.getElementById('btnCalib').textContent = 'Sensor tidak tersedia';
+    }
+
+    // initialise with a default (Jakarta) for pleasant display
+    userLat = -6.200000; userLon = 106.816666; document.getElementById('latInput').value=userLat; document.getElementById('lonInput').value=userLon; updateUI();
+
+  </script>
+</body>
+</html>
